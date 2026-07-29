@@ -15,8 +15,7 @@ load_dotenv()
 # ================== 配置区 ==================
 API_ID = int(os.getenv('API_ID'))
 API_HASH = os.getenv("API_HASH")
-# CHANNEL_USERNAME = 'weme_download'
-CHANNEL_USERNAME = 'TAOSEWEIMI'  # 修改为你需要的频道
+CHANNEL_USERNAME = 'channel_name'  # 修改为你需要的频道
 
 PROXY = {
     'proxy_type': 'socks5',
