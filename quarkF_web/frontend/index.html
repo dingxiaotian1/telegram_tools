@@ -430,6 +430,36 @@
             margin-bottom: 8px;
         }
 
+        /* ==================== 来源标记 ==================== */
+        .source-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            padding: 1px 7px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+
+        .source-badge.quark {
+            background: rgba(64, 134, 255, 0.15);
+            color: #60a5fa;
+            border: 1px solid rgba(64, 134, 255, 0.3);
+        }
+
+        .source-badge.baidu {
+            background: rgba(37, 124, 238, 0.15);
+            color: #6ab0ff;
+            border: 1px solid rgba(37, 124, 238, 0.3);
+        }
+
+        .source-badge.other {
+            background: rgba(156, 163, 175, 0.15);
+            color: #9ca3af;
+            border: 1px solid rgba(156, 163, 175, 0.3);
+        }
+
         .card-tags {
             display: flex;
             flex-wrap: wrap;
@@ -1005,9 +1035,13 @@
                                 {{ item.resource_desc }}
                             </div>
 
-                            <!-- 元信息：发布时间 -->
+                            <!-- 元信息：发布时间 + 来源 -->
                             <div class="card-meta">
                                 <span>{{ item.publish_time }}</span>
+                                <span
+                                    class="source-badge"
+                                    :class="getSourceClass(item.link_url)"
+                                >{{ getSourceName(item.link_url) }}</span>
                             </div>
 
                             <!-- 标签列表 -->
@@ -1208,6 +1242,9 @@ const app = createApp({
         });
 
         /** API 基础地址 */
+        // 【重点注释】使用空字符串（相对路径），自动匹配当前页面地址
+        // 因为前端通过 FastAPI 静态文件托管在同一服务上，无需硬编码端口
+        // 如果前后端分离部署，将这里改为实际后端地址，如 'http://localhost:8000'
         const API_BASE = '';
 
         // ==================== 计算属性 ====================
@@ -1498,6 +1535,39 @@ const app = createApp({
             }
         }
 
+        // ==================== 来源判断 ====================
+
+        /**
+         * 根据链接获取来源名称
+         *
+         * 【重点注释】通过 link_url 中的关键词判断资源来源
+         *   - 含 "quark" → 夸克网盘
+         *   - 含 "baidu" → 百度网盘
+         *   - 其他 → 其他来源
+         *
+         * @param {string} url 资源链接
+         * @returns {string} 来源名称
+         */
+        function getSourceName(url) {
+            if (!url) return '其他';
+            if (url.includes('quark')) return '夸克';
+            if (url.includes('baidu')) return '百度';
+            return '其他';
+        }
+
+        /**
+         * 根据链接获取来源 CSS 类名
+         *
+         * @param {string} url 资源链接
+         * @returns {string} CSS 类名
+         */
+        function getSourceClass(url) {
+            if (!url) return 'other';
+            if (url.includes('quark')) return 'quark';
+            if (url.includes('baidu')) return 'baidu';
+            return 'other';
+        }
+
         // ==================== Toast 提示 ====================
 
         /**
@@ -1639,6 +1709,8 @@ const app = createApp({
             onKeywordInput,
             copyLink,
             onImageError,
+            getSourceName,
+            getSourceClass,
             confirmDelete,
             doDelete,
         };
