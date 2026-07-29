@@ -45,8 +45,6 @@ from cachetools import TTLCache
 from config import settings, PROJECT_ROOT
 
 # ==================== 日志配置 ====================
-# 【重点注释】配置结构化日志，方便问题排查
-# 日志级别：INFO 记录正常运行信息，ERROR 记录异常
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s | %(levelname)-7s | %(name)s | %(message)s',
@@ -55,10 +53,6 @@ logging.basicConfig(
 logger = logging.getLogger('quarkF-API')
 
 # ==================== 应用生命周期管理 ====================
-# 【重点注释】使用 lifespan 替代已弃用的 on_event
-# FastAPI 新版本推荐使用上下文管理器管理启动/关闭逻辑
-
-
 @asynccontextmanager
 async def lifespan(app_instance: FastAPI):
     """
@@ -83,7 +77,7 @@ async def lifespan(app_instance: FastAPI):
     logger.info(f"图片目录: {settings.IMAGE_BASE_DIR}")
     logger.info(f"API 文档: http://localhost:{settings.API_PORT}/api/docs")
 
-    # 【重点注释】预热数据库连接池
+    # 预热数据库连接池
     try:
         pool = await get_db_pool()
         async with pool.acquire() as conn:
@@ -98,7 +92,7 @@ async def lifespan(app_instance: FastAPI):
 
     logger.info("=" * 60)
 
-    yield   # 【重点注释】yield 之后是关闭逻辑
+    yield   # yield 之后是关闭逻辑
 
     # ==================== 关闭逻辑 ====================
     logger.info("quarkF API 服务关闭中...")
@@ -179,7 +173,7 @@ async def get_db_pool() -> aiomysql.Pool:
 
 
 # ==================== 缓存配置 ====================
-# 【重点注释】使用 cachetools 的 TTLCache 实现带过期时间的内存缓存
+# 使用 cachetools 的 TTLCache 实现带过期时间的内存缓存
 # 缓存键为字符串，值为对应的查询结果
 tags_cache = TTLCache(maxsize=10, ttl=settings.CACHE_TAGS_TTL)
 """标签列表缓存：最多缓存 10 份，有效期 5 分钟"""
@@ -308,11 +302,11 @@ async def get_quarkf_list(
 
     try:
         # ==================== 参数标准化 ====================
-        # 【重点注释】如果 tag 参数包含 # 号，自动去除，兼容两种输入方式
+        # 如果 tag 参数包含 # 号，自动去除，兼容两种输入方式
         clean_tag = tag.lstrip('#') if tag else None
 
         # ==================== 缓存查询 ====================
-        # 【重点注释】生成缓存键，检查缓存中是否有数据
+        # 生成缓存键，检查缓存中是否有数据
         cache_key = make_list_cache_key(page, page_size, clean_tag, keyword)
         cached = list_cache.get(cache_key)
         if cached is not None:
@@ -326,7 +320,7 @@ async def get_quarkf_list(
             async with conn.cursor(aiomysql.DictCursor) as cursor:
 
                 # ==================== 构建查询条件 ====================
-                # 【重点注释】动态构建 WHERE 子句，根据参数决定查询条件
+                # 动态构建 WHERE 子句，根据参数决定查询条件
                 where_clauses = []      # WHERE 条件列表
                 params = []             # 参数列表（用于参数化查询）
 
@@ -364,7 +358,7 @@ async def get_quarkf_list(
                 where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
 
                 # ==================== 查询总数 ====================
-                # 【重点注释】先查询总记录数，用于计算页数
+                # 先查询总记录数，用于计算页数
                 count_sql = f"SELECT COUNT(*) AS total FROM quarkF q WHERE {where_sql}"
                 await cursor.execute(count_sql, params)
                 result = await cursor.fetchone()
@@ -375,7 +369,7 @@ async def get_quarkf_list(
                 offset = (page - 1) * page_size
 
                 # ==================== 查询当前页数据 ====================
-                # 【重点注释】按发布时间降序排列，最新的排在前面
+                # 按发布时间降序排列，最新的排在前面
                 # 使用 LIMIT + OFFSET 实现分页
                 data_sql = f"""
                     SELECT
@@ -396,7 +390,7 @@ async def get_quarkf_list(
                 items = await cursor.fetchall()
 
         # ==================== 数据处理 ====================
-        # 【重点注释】将数据库查询结果转换为前端需要的格式
+        # 将数据库查询结果转换为前端需要的格式
         processed_items = []
         for item in items:
             # 解析 JSON 格式的标签
@@ -407,14 +401,14 @@ async def get_quarkf_list(
                 except (json.JSONDecodeError, TypeError):
                     tags_list = []
 
-            # 【重点注释】检查图片文件是否存在
+            # 检查图片文件是否存在
             # 图片文件名规则：{message_id}.jpg
             image_url = None
             image_path = os.path.join(settings.IMAGE_BASE_DIR, f"{item['message_id']}.jpg")
             if os.path.exists(image_path):
                 image_url = f"/api/quarkf/images/{item['message_id']}.jpg"
 
-            # 【重点注释】裁剪过长的描述文本，优化前端显示
+            # 裁剪过长的描述文本，优化前端显示
             desc = item.get('resource_desc', '') or ''
             if len(desc) > 200:
                 desc = desc[:200] + '...'
@@ -445,7 +439,7 @@ async def get_quarkf_list(
         }
 
         # ==================== 写入缓存 ====================
-        # 【重点注释】将查询结果缓存，下次相同查询直接返回
+        # 将查询结果缓存，下次相同查询直接返回
         list_cache[cache_key] = response_data
 
         elapsed = time.time() - start_time
@@ -455,7 +449,7 @@ async def get_quarkf_list(
         return response_data
 
     except Exception as e:
-        # 【重点注释】全局异常捕获，记录日志并返回友好错误信息
+        # 全局异常捕获，记录日志并返回友好错误信息
         logger.error(f"列表查询异常: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
@@ -507,7 +501,7 @@ async def get_tags():
         async with pool.acquire() as conn:
             async with conn.cursor(aiomysql.DictCursor) as cursor:
 
-                # 【重点注释】优先从 quarkF_tags 关联表查询（推荐方案）
+                # 优先从 quarkF_tags 关联表查询（推荐方案）
                 # 如果关联表存在且有数据，查询性能更高
                 try:
                     await cursor.execute("""
@@ -522,11 +516,11 @@ async def get_tags():
                     if tag_rows:
                         tags_data = [{"tag": row['tag'], "count": row['count']} for row in tag_rows]
                     else:
-                        # 【重点注释】关联表为空时，降级从主表 JSON 字段解析
+                        # 关联表为空时，降级从主表 JSON 字段解析
                         tags_data = await _parse_tags_from_json(cursor)
 
                 except Exception:
-                    # 【重点注释】关联表不存在时（如未执行迁移脚本），降级方案
+                    # 关联表不存在时（如未执行迁移脚本），降级方案
                     logger.warning("quarkF_tags 表不存在或查询失败，降级使用 JSON 解析")
                     tags_data = await _parse_tags_from_json(cursor)
 
@@ -575,7 +569,7 @@ async def _parse_tags_from_json(cursor) -> List[dict]:
         except (json.JSONDecodeError, TypeError):
             continue
 
-    # 【重点注释】按使用频率降序排列，取前 200 个标签
+    # 按使用频率降序排列，取前 200 个标签
     sorted_tags = sorted(tag_count.items(), key=lambda x: x[1], reverse=True)[:200]
     return [{"tag": tag, "count": count} for tag, count in sorted_tags]
 
@@ -604,10 +598,10 @@ async def get_image(image_id: int):
       浏览器会自动缓存图片，减少重复请求。
     ==========================================================================
     """
-    # 【重点注释】构建图片文件的完整路径
+    # 构建图片文件的完整路径
     image_path = os.path.join(settings.IMAGE_BASE_DIR, f"{image_id}.jpg")
 
-    # 【重点注释】检查文件是否存在且是合法文件
+    # 检查文件是否存在且是合法文件
     if not os.path.exists(image_path):
         logger.warning(f"图片不存在: {image_path}")
         raise HTTPException(status_code=404, detail={
@@ -615,7 +609,7 @@ async def get_image(image_id: int):
             "message": f"图片 {image_id}.jpg 不存在",
         })
 
-    # 【重点注释】使用 FileResponse 返回图片文件
+    # 使用 FileResponse 返回图片文件
     # media_type 指定 MIME 类型，filename 用于浏览器识别
     return FileResponse(
         path=image_path,
@@ -728,7 +722,7 @@ async def delete_quarkf(message_id: int):
         pool = await get_db_pool()
 
         async with pool.acquire() as conn:
-            # 【重点注释】使用事务保证原子性
+            # 使用事务保证原子性
             # 主表和关联表必须同时删除成功
             async with conn.cursor() as cursor:
                 # 删除关联表中的标签记录
@@ -745,7 +739,7 @@ async def delete_quarkf(message_id: int):
                 )
                 row_deleted = cursor.rowcount
 
-        # 【重点注释】尝试删除本地图片文件（非关键操作）
+        # 尝试删除本地图片文件（非关键操作）
         # 图片文件可能不存在，删除失败不影响业务
         image_path = os.path.join(settings.IMAGE_BASE_DIR, f"{message_id}.jpg")
         file_deleted = False
@@ -763,7 +757,7 @@ async def delete_quarkf(message_id: int):
                 "message": f"message_id={message_id} 不存在",
             })
 
-        # 【重点注释】清除缓存，确保下次查询数据一致
+        # 清除缓存，确保下次查询数据一致
         list_cache.clear()
         tags_cache.clear()
 
@@ -791,8 +785,8 @@ async def delete_quarkf(message_id: int):
 
 
 # ==================== 静态文件托管 ====================
-# 【重点注释】将 frontend 目录挂载为静态文件服务
-# 这样用户访问 http://localhost:8001 即可打开前端页面
+# 将 frontend 目录挂载为静态文件服务
+# 这样用户访问 http://localhost:8000 即可打开前端页面
 # 同时也实现了 API 和前端同源，图片和 API 请求无需跨域
 FRONTEND_DIR = os.path.join(PROJECT_ROOT, 'quarkF_web', 'frontend')
 if os.path.exists(FRONTEND_DIR):
