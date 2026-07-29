@@ -571,6 +571,53 @@
             padding: 0 8px;
         }
 
+        /* ==================== 跳转输入 ==================== */
+        .page-jump {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            margin-left: 6px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .page-jump label {
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .page-input {
+            width: 44px;
+            padding: 3px 6px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 12px;
+            text-align: center;
+            outline: none;
+            transition: border-color var(--transition);
+        }
+
+        .page-input:focus {
+            border-color: var(--accent);
+        }
+
+        /* 去除 number 输入框的上下箭头（Firefox 用下面的方式） */
+        .page-input::-webkit-outer-spin-button,
+        .page-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .page-input[type='number'] {
+            -moz-appearance: textfield;
+        }
+
+        .page-btn-sm {
+            padding: 3px 8px;
+            font-size: 11px;
+        }
+
         /* ==================== 加载状态 ==================== */
         .loading-state {
             display: flex;
@@ -1122,6 +1169,21 @@
                     <span class="page-info">
                         {{ currentPage }} / {{ totalPages }}
                     </span>
+
+                    <!-- 跳转指定页 -->
+                    <span class="page-jump">
+                        <label for="gotoPage">跳转</label>
+                        <input
+                            id="gotoPage"
+                            type="number"
+                            class="page-input"
+                            :min="1"
+                            :max="totalPages"
+                            :placeholder="currentPage"
+                            @keydown.enter="jumpToPage"
+                        />
+                        <button class="page-btn page-btn-sm" @click="jumpToPage">GO</button>
+                    </span>
                 </div>
             </template>
         </div>
@@ -1255,34 +1317,57 @@ const app = createApp({
         /**
          * 生成分页页码列表
          * 【算法说明】
-         *   当前页前后各显示 2 页，首尾固定显示，中间用 ... 省略
-         *   例如共 20 页，当前在第 10 页：
-         *   1 2 ... 8 9 10 11 12 ... 19 20
+         *   固定显示 : 第 1、2 页 + 倒数第 1、2 页
+         *   中间显示 : 当前页前后各 2 页（共 5 个连续页码）
+         *   省略号   : 仅在固定页与中间页之间有 ≥ 2 个隐藏页时显示
+         *
+         * 【示例】
+         *   共 299 页，当前第 100 页：
+         *   1 2 ... 98 99 100 101 102 ... 298 299
+         *
+         *   共 299 页，当前第 5 页（左侧无省略，连续显示）：
+         *   1 2 3 4 5 6 7 ... 298 299
          */
         const pageNumbers = computed(() => {
             const pages = [];
             const total = totalPages.value;
             const current = currentPage.value;
 
-            if (total <= 7) {
-                // 总页数少于 7 页，全部显示
+            // 总页数 ≤ 11 时全部显示（2 + 2 + 5 + 2 个省略占位 = 11）
+            if (total <= 11) {
                 for (let i = 1; i <= total; i++) pages.push(i);
-            } else {
-                // 始终显示第 1 页
-                pages.push(1);
-
-                if (current > 3) pages.push('...');
-
-                // 当前页附近 3 页
-                const start = Math.max(2, current - 1);
-                const end = Math.min(total - 1, current + 1);
-                for (let i = start; i <= end; i++) pages.push(i);
-
-                if (current < total - 2) pages.push('...');
-
-                // 始终显示最后 1 页
-                pages.push(total);
+                return pages;
             }
+
+            // ---- 固定显示第 1、2 页 ----
+            pages.push(1, 2);
+
+            // ---- 计算中间 5 页的起止范围 ----
+            let midStart = Math.max(3, current - 2);           // 至少从第 3 页开始
+            let midEnd = Math.min(total - 2, current + 2);     // 最多到倒数第 3 页
+
+            // ---- 左省略号：仅在固定页与中间页之间有 ≥ 2 个隐藏页时显示 ----
+            const gapLeft = midStart - 3;  // 从第 3 页到中间起始之间隐藏的页数
+            if (gapLeft >= 2) {
+                pages.push('...');
+            } else {
+                midStart = 3;  // 隐藏页不足 2 个，连续显示
+            }
+
+            // ---- 中间连续 5 页（或更少，靠近首尾时） ----
+            for (let i = midStart; i <= midEnd; i++) {
+                pages.push(i);
+            }
+
+            // ---- 右省略号 ----
+            const gapRight = (total - 2) - midEnd;  // 从中间结束到倒数第 2 页之间隐藏的页数
+            if (gapRight >= 2) {
+                pages.push('...');
+            }
+
+            // ---- 固定显示最后 2 页 ----
+            pages.push(total - 1, total);
+
             return pages;
         });
 
@@ -1417,6 +1502,22 @@ const app = createApp({
          */
         function goToPage(page) {
             if (page < 1 || page > totalPages.value) return;
+            currentPage.value = page;
+            fetchData();
+        }
+
+        /**
+         * 跳转到指定页
+         *
+         * 【重点注释】从输入框读取页码，校验范围后跳转
+         * 校验成功后清空输入框，以便下次输入
+         */
+        function jumpToPage() {
+            const input = document.getElementById('gotoPage');
+            if (!input) return;
+            const page = parseInt(input.value, 10);
+            input.value = '';
+            if (isNaN(page) || page < 1 || page > totalPages.value) return;
             currentPage.value = page;
             fetchData();
         }
@@ -1706,6 +1807,7 @@ const app = createApp({
             fetchData,
             selectTag,
             goToPage,
+            jumpToPage,
             onKeywordInput,
             copyLink,
             onImageError,
