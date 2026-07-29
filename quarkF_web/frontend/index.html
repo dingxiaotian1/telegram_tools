@@ -1,0 +1,1651 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>quarkF 频道 - 资源展示</title>
+
+    <!-- ==================== 外部资源加载 ==================== -->
+    <!-- 【重点注释】使用 CDN 加载 Vue 3，无需 npm 构建步骤 -->
+    <!-- 兼容 Vue 3.4.x 版本 -->
+    <script src="https://unpkg.com/vue@3.4.21/dist/vue.global.prod.js"></script>
+
+    <style>
+        /*
+        ===================================================================
+        全局样式重置与设计系统
+        ===================================================================
+
+        【设计思路】
+          1. 使用 CSS 变量定义设计令牌（颜色、圆角、阴影等），方便统一修改
+          2. 采用移动优先（Mobile-first）的响应式设计
+          3. 深色主题（Dark Mode），适合浏览内容类网站
+          4. 所有交互元素（按钮、卡片、标签）都有明确的 hover/active 状态
+
+        【色彩系统】
+          背景色: #0f0f11（深黑色）
+          卡片色: #1a1a1e（暗灰色）
+          主色调: #8b5cf6（淡紫色）
+          文字色: #e4e4e7（浅灰色）
+        ===================================================================
+        */
+
+        /* ==================== 全局变量 ==================== */
+        :root {
+            --bg-primary: #0f0f11;        /* 主背景色 */
+            --bg-secondary: #1a1a1e;       /* 卡片/次级区域背景 */
+            --bg-hover: #242428;            /* 悬停背景色 */
+            --bg-tag: #1e1b4b;              /* 标签背景色 */
+            --bg-tag-active: #8b5cf6;       /* 标签选中背景色 */
+
+            --text-primary: #e4e4e7;        /* 主文字色 */
+            --text-secondary: #a1a1aa;      /* 次级文字色 */
+            --text-muted: #71717a;          /* 辅助文字色 */
+
+            --accent: #8b5cf6;              /* 强调色（主色调） */
+            --accent-light: #a78bfa;        /* 浅强调色 */
+            --accent-dark: #7c3aed;         /* 深强调色 */
+
+            --border-color: #27272a;        /* 边框颜色 */
+            --border-radius: 12px;           /* 圆角大小 */
+            --card-radius: 10px;             /* 卡片圆角 */
+            --shadow: 0 4px 6px -1px rgba(0,0,0,0.3);  /* 卡片阴影 */
+
+            --transition: 0.2s ease;         /* 过渡动画时长 */
+            --max-width: 1400px;             /* 内容最大宽度 */
+        }
+
+        /* ==================== 基础重置 ==================== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        /* ==================== 滚动条美化 ==================== */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #3f3f46;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #52525b;
+        }
+
+        /* ==================== 顶部导航栏 ==================== */
+        .navbar {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(15, 15, 17, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0 20px;
+        }
+
+        .navbar-inner {
+            max-width: var(--max-width);
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 60px;
+            gap: 16px;
+        }
+
+        .navbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-primary);
+            text-decoration: none;
+            white-space: nowrap;
+        }
+
+        .navbar-brand .brand-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--accent), #ec4899);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            color: white;
+        }
+
+        .navbar-brand .brand-sub {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+
+        /* ==================== 搜索框 ==================== */
+        .search-box {
+            flex: 1;
+            max-width: 360px;
+            position: relative;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 8px 12px 8px 36px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 14px;
+            outline: none;
+            transition: border var(--transition);
+        }
+
+        .search-box input:focus {
+            border-color: var(--accent);
+        }
+
+        .search-box input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .search-box .search-icon {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 14px;
+            pointer-events: none;
+        }
+
+        /* ==================== 统计信息 ==================== */
+        .stats-badge {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            font-size: 12px;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        .stats-badge .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .stats-badge .stat-item .num {
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        /* ==================== 主体布局 ==================== */
+        .main-container {
+            max-width: var(--max-width);
+            margin: 0 auto;
+            padding: 20px;
+            display: grid;
+            grid-template-columns: 220px 1fr;
+            gap: 24px;
+        }
+
+        /* ==================== 左侧 - 标签筛选面板 ==================== */
+        .sidebar {
+            position: sticky;
+            top: 80px;
+            height: fit-content;
+            max-height: calc(100vh - 100px);
+            overflow-y: auto;
+        }
+
+        .sidebar-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+            padding: 0 4px;
+        }
+
+        .tag-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .tag-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            color: var(--text-secondary);
+            transition: all var(--transition);
+            user-select: none;
+        }
+
+        .tag-item:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .tag-item.active {
+            background: var(--bg-tag-active);
+            color: white;
+        }
+
+        .tag-item .tag-name {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .tag-item .tag-name::before {
+            content: '#';
+            opacity: 0.5;
+        }
+
+        .tag-item .tag-count {
+            font-size: 11px;
+            opacity: 0.6;
+        }
+
+        .tag-item.active .tag-count {
+            opacity: 0.8;
+        }
+
+        .tag-clear-btn {
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            color: var(--text-muted);
+            transition: all var(--transition);
+            text-align: center;
+        }
+
+        .tag-clear-btn:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        /* ==================== 右侧 - 内容区 ==================== */
+        .content-area {
+            min-height: 60vh;
+        }
+
+        /* ==================== 内容网格布局 ==================== */
+        /*
+        ===================================================================
+        卡片网格（核心布局）
+        ===================================================================
+
+        【布局策略】
+          使用 CSS Grid 自适应布局：
+          - 桌面端（>1200px）：4 列
+          - 平板（768-1200px）：3 列
+          - 手机（<768px）：2 列
+          - 小手机（<480px）：1 列
+
+          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr))
+          让浏览器根据容器宽度自动计算列数，无需媒体查询。
+
+        【性能优化】
+          卡片使用 contain: content 限制浏览器的重排范围。
+        ===================================================================
+        */
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+        }
+
+        /* ==================== 单张卡片 ==================== */
+        .card {
+            background: var(--bg-secondary);
+            border-radius: var(--card-radius);
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            transition: transform var(--transition), box-shadow var(--transition);
+            contain: content;           /* 【重点注释】限制重排范围，提升滚动性能 */
+            cursor: pointer;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        }
+
+        /* ==================== 图片容器 ==================== */
+        /*
+        ===================================================================
+        图片懒加载实现
+        ===================================================================
+
+        【实现方案】
+          使用 IntersectionObserver API 实现懒加载（见底部 JS）。
+          - loading="lazy" 属性：浏览器原生懒加载支持
+          - 占位背景色：防止加载时白屏闪烁
+          - 16:9 比例容器：保持布局稳定，防止布局偏移（CLS）
+
+        【优化点】
+          1. onerror 事件：图片加载失败时显示友好占位
+          2. 渐变背景过渡：从占位到图片加载完成的平滑过渡
+        ===================================================================
+        */
+        .card-image {
+            position: relative;
+            width: 100%;
+            padding-top: 56.25%;        /* 16:9 比例 */
+            background: #18181b;
+            overflow: hidden;
+        }
+
+        .card-image img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: opacity 0.3s ease;
+        }
+
+        .card-image img[data-loaded="false"] {
+            opacity: 0;
+        }
+
+        .card-image img[data-loaded="true"] {
+            opacity: 1;
+        }
+
+        /* 图片加载失败的占位 */
+        .card-image .img-placeholder {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            font-size: 32px;
+            background: linear-gradient(135deg, #18181b, #1f1f23);
+        }
+
+        /* ==================== 卡片内容区域 ==================== */
+        .card-body {
+            padding: 12px 14px 14px;
+        }
+
+        .card-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;          /* 限制 2 行 */
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            margin-bottom: 6px;
+        }
+
+        .card-desc {
+            font-size: 12px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            margin-bottom: 8px;
+            min-height: 54px;
+        }
+
+        .card-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .card-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .card-tag {
+            padding: 2px 8px;
+            background: var(--bg-tag);
+            color: var(--accent-light);
+            border-radius: 4px;
+            font-size: 11px;
+            transition: background var(--transition);
+        }
+
+        .card-tag:hover {
+            background: #2e1065;
+        }
+
+        .card-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .card-btn {
+            flex: 1;
+            padding: 6px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all var(--transition);
+            text-align: center;
+            text-decoration: none;
+        }
+
+        .card-btn:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+            border-color: var(--accent);
+        }
+
+        .card-btn.primary {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        .card-btn.primary:hover {
+            background: var(--accent-dark);
+        }
+
+        .card-btn.danger {
+            border-color: #7f1d1d;
+            color: #fca5a5;
+        }
+
+        .card-btn.danger:hover {
+            background: #7f1d1d;
+            color: #fecaca;
+            border-color: #ef4444;
+        }
+
+        /* ==================== 分页控件 ==================== */
+        .pagination {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            margin-top: 32px;
+            padding: 16px 0;
+        }
+
+        .page-btn {
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            font-size: 13px;
+            cursor: pointer;
+            transition: all var(--transition);
+            min-width: 36px;
+            text-align: center;
+        }
+
+        .page-btn:hover:not(:disabled):not(.active) {
+            background: var(--bg-hover);
+            border-color: var(--accent);
+        }
+
+        .page-btn.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        .page-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .page-info {
+            font-size: 13px;
+            color: var(--text-muted);
+            padding: 0 8px;
+        }
+
+        /* ==================== 加载状态 ==================== */
+        .loading-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 80px 20px;
+            color: var(--text-muted);
+        }
+
+        .loading-spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid var(--border-color);
+            border-top: 3px solid var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ==================== 空状态 ==================== */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 80px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-state .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.3;
+        }
+
+        .empty-state .empty-text {
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+
+        .empty-state .empty-hint {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        /* ==================== 错误状态 ==================== */
+        .error-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 20px;
+        }
+
+        .error-state .error-text {
+            color: #ef4444;
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+
+        .retry-btn {
+            padding: 8px 24px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background var(--transition);
+        }
+
+        .retry-btn:hover {
+            background: var(--accent-dark);
+        }
+
+        /* ==================== 移动端标签切换按钮 ==================== */
+        .mobile-tag-toggle {
+            display: none;
+            padding: 8px 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            cursor: pointer;
+            margin-bottom: 12px;
+            transition: all var(--transition);
+        }
+
+        .mobile-tag-toggle:hover {
+            background: var(--bg-hover);
+        }
+
+        /* ==================== 确认删除弹窗 ==================== */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            z-index: 999;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .modal-box {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+        }
+
+        .modal-box h3 {
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+
+        .modal-box p {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .modal-btn {
+            padding: 8px 20px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 13px;
+            cursor: pointer;
+            transition: all var(--transition);
+        }
+
+        .modal-btn:hover {
+            background: var(--bg-hover);
+        }
+
+        .modal-btn.danger {
+            background: #dc2626;
+            color: white;
+            border-color: #dc2626;
+        }
+
+        .modal-btn.danger:hover {
+            background: #b91c1c;
+        }
+
+        /* ==================== Toast 提示 ==================== */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-size: 13px;
+            color: var(--text-primary);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            pointer-events: none;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* ==================== 响应式设计 ==================== */
+        /*
+        ===================================================================
+        响应式断点
+        ===================================================================
+
+        桌面端（>1024px）：双栏布局（侧边栏 + 内容）
+        平板（768-1024px）：双栏，卡片调整为 2-3 列
+        手机（<768px）：单栏，标签面板折叠为抽屉
+        ===================================================================
+        */
+
+        /* 平板及以下 */
+        @media (max-width: 1024px) {
+            .main-container {
+                grid-template-columns: 180px 1fr;
+                gap: 16px;
+                padding: 16px;
+            }
+
+            .card-grid {
+                grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            }
+
+            .navbar-brand .brand-sub {
+                display: none;
+            }
+
+            .stats-badge {
+                gap: 10px;
+            }
+        }
+
+        /* 手机端 */
+        @media (max-width: 768px) {
+            .navbar-inner {
+                height: 52px;
+            }
+
+            .navbar-brand {
+                font-size: 15px;
+            }
+
+            .navbar-brand .brand-icon {
+                width: 28px;
+                height: 28px;
+                font-size: 14px;
+            }
+
+            .main-container {
+                grid-template-columns: 1fr;     /* 单栏布局 */
+                padding: 12px;
+                gap: 0;
+            }
+
+            /* 标签面板作为可折叠抽屉 */
+            .sidebar {
+                position: relative;
+                top: 0;
+                max-height: none;
+                overflow: visible;
+                margin-bottom: 12px;
+            }
+
+            .sidebar.collapsed .tag-list,
+            .sidebar.collapsed .tag-clear-btn {
+                display: none;
+            }
+
+            .tag-list {
+                flex-direction: row;
+                flex-wrap: wrap;
+                gap: 6px;
+                max-height: 200px;
+                overflow-y: auto;
+                padding: 4px 0;
+            }
+
+            .tag-item {
+                font-size: 12px;
+                padding: 4px 10px;
+                border-radius: 20px;         /* 手机端标签使用药丸样式 */
+                background: var(--bg-secondary);
+                border: 1px solid var(--border-color);
+            }
+
+            .tag-item .tag-count {
+                display: none;
+            }
+
+            .mobile-tag-toggle {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                width: 100%;
+            }
+
+            .card-grid {
+                grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+                gap: 10px;
+            }
+
+            .stats-badge .stat-divider {
+                display: none;
+            }
+
+            .search-box {
+                display: none;  /* 手机端搜索框移到其他地方 */
+            }
+
+            .page-btn {
+                padding: 6px 10px;
+                font-size: 12px;
+                min-width: 32px;
+            }
+        }
+
+        /* 小手机 */
+        @media (max-width: 480px) {
+            .card-grid {
+                grid-template-columns: 1fr;  /* 单列卡片 */
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ==================== Vue 3 应用挂载点 ==================== -->
+<div id="app">
+
+    <!-- ==================== 顶部导航栏 ==================== -->
+    <!-- 【重点注释】使用 sticky 定位，滚动时固定在顶部 -->
+    <nav class="navbar">
+        <div class="navbar-inner">
+            <!-- 品牌 Logo -->
+            <a class="navbar-brand" href="/">
+                <span class="brand-icon">Q</span>
+                <span>quarkF 频道</span>
+                <span class="brand-sub">资源展示</span>
+            </a>
+
+            <!-- 搜索框 -->
+            <div class="search-box">
+                <span class="search-icon">&#128269;</span>
+                <input
+                    type="text"
+                    v-model="keyword"
+                    placeholder="搜索标题..."
+                    @input="onKeywordInput"
+                />
+            </div>
+
+            <!-- 统计信息 -->
+            <div class="stats-badge">
+                <span class="stat-item">
+                    资源 <span class="num">{{ stats.total_messages }}</span>
+                </span>
+                <span class="stat-divider">|</span>
+                <span class="stat-item">
+                    标签 <span class="num">{{ stats.total_tags }}</span>
+                </span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ==================== 主体内容 ==================== -->
+    <div class="main-container">
+
+        <!-- ==================== 左侧 - 标签筛选面板 ==================== -->
+        <aside class="sidebar" :class="{ collapsed: mobileSidebarCollapsed }">
+            <!-- 移动端显示切换按钮 -->
+            <button class="mobile-tag-toggle" @click="mobileSidebarCollapsed = !mobileSidebarCollapsed">
+                <span>{{ selectedTag ? '# ' + selectedTag : '全部标签' }}</span>
+                <span>{{ mobileSidebarCollapsed ? '&#9660;' : '&#9650;' }}</span>
+            </button>
+
+            <div class="sidebar-title">标签筛选</div>
+            <div class="tag-list">
+                <!-- 【重点注释】"全部" 选项，清除筛选条件 -->
+                <div
+                    class="tag-item"
+                    :class="{ active: !selectedTag }"
+                    @click="selectTag(null)"
+                >
+                    <span class="tag-name">全部</span>
+                </div>
+
+                <!-- 【重点注释】动态渲染标签列表 -->
+                <!-- 使用 v-for 遍历 tags 数组，生成标签选择项 -->
+                <div
+                    v-for="t in tags"
+                    :key="t.tag"
+                    class="tag-item"
+                    :class="{ active: selectedTag === t.tag }"
+                    @click="selectTag(t.tag)"
+                >
+                    <span class="tag-name">{{ t.tag.replace('#', '') }}</span>
+                    <span class="tag-count">{{ t.count }}</span>
+                </div>
+            </div>
+            <div class="tag-clear-btn" @click="selectTag(null)" v-if="selectedTag">
+                清除筛选
+            </div>
+        </aside>
+
+        <!-- ==================== 右侧 - 内容区域 ==================== -->
+        <div class="content-area">
+
+            <!-- 加载中状态 -->
+            <div v-if="loading" class="loading-state">
+                <div class="loading-spinner"></div>
+                <span>加载中...</span>
+            </div>
+
+            <!-- 错误状态 -->
+            <div v-else-if="error" class="error-state">
+                <div class="error-text">{{ error }}</div>
+                <button class="retry-btn" @click="fetchData">重新加载</button>
+            </div>
+
+            <!-- 空数据状态 -->
+            <div v-else-if="items.length === 0" class="empty-state">
+                <div class="empty-icon">&#128196;</div>
+                <div class="empty-text">暂无数据</div>
+                <div class="empty-hint">换个标签试试，或者稍后再来看看</div>
+            </div>
+
+            <!-- 数据卡片网格 -->
+            <template v-else>
+                <div class="card-grid">
+                    <!--
+                    ==========================================================
+                    单张卡片组件
+                    ==========================================================
+
+                    【重点注释】使用 IntersectionObserver 实现图片懒加载
+                    data-loaded 属性控制图片的显示/隐藏
+                    v-lazy 自定义指令监听元素是否进入视口
+                    ==========================================================
+                    -->
+                    <div
+                        v-for="item in items"
+                        :key="item.message_id"
+                        class="card"
+                    >
+                        <!-- 图片区域 -->
+                        <div class="card-image">
+                            <!-- 【重点注释】有图片时显示图片，否则显示占位 -->
+                            <img
+                                v-if="item.image_url"
+                                :data-src="item.image_url"
+                                :alt="item.title"
+                                v-lazy
+                                @error="onImageError($event, item)"
+                            />
+                            <div v-else class="img-placeholder">&#128247;</div>
+                        </div>
+
+                        <!-- 卡片内容 -->
+                        <div class="card-body">
+                            <!-- 标题 -->
+                            <div class="card-title" :title="item.title">
+                                {{ item.title }}
+                            </div>
+
+                            <!-- 资源描述 -->
+                            <div class="card-desc" v-if="item.resource_desc">
+                                {{ item.resource_desc }}
+                            </div>
+
+                            <!-- 元信息：发布时间 -->
+                            <div class="card-meta">
+                                <span>{{ item.publish_time }}</span>
+                            </div>
+
+                            <!-- 标签列表 -->
+                            <div class="card-tags" v-if="item.tags && item.tags.length">
+                                <span
+                                    v-for="tag in item.tags"
+                                    :key="tag"
+                                    class="card-tag"
+                                    @click.stop="selectTag(tag)"
+                                >
+                                    {{ tag }}
+                                </span>
+                            </div>
+
+                            <!-- 操作按钮 -->
+                            <div class="card-actions">
+                                <a
+                                    :href="item.link_url"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="card-btn primary"
+                                    @click.stop
+                                >
+                                    查看资源
+                                </a>
+                                <button
+                                    class="card-btn"
+                                    @click.stop="copyLink(item.link_url)"
+                                >
+                                    复制链接
+                                </button>
+                                <button
+                                    class="card-btn danger"
+                                    @click.stop="confirmDelete(item)"
+                                >
+                                    删除
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== 分页控件 ==================== -->
+                <div class="pagination" v-if="totalPages > 1">
+                    <!-- 上一页 -->
+                    <button
+                        class="page-btn"
+                        :disabled="currentPage <= 1"
+                        @click="goToPage(currentPage - 1)"
+                    >
+                        &laquo;
+                    </button>
+
+                    <!-- 【重点注释】动态生成页码按钮 -->
+                    <!-- 显示前 3 页、后 3 页、当前页附近的页码 -->
+                    <template v-for="p in pageNumbers" :key="p">
+                        <span v-if="p === '...'" class="page-info">...</span>
+                        <button
+                            v-else
+                            class="page-btn"
+                            :class="{ active: p === currentPage }"
+                            @click="goToPage(p)"
+                        >
+                            {{ p }}
+                        </button>
+                    </template>
+
+                    <!-- 下一页 -->
+                    <button
+                        class="page-btn"
+                        :disabled="currentPage >= totalPages"
+                        @click="goToPage(currentPage + 1)"
+                    >
+                        &raquo;
+                    </button>
+
+                    <!-- 页码信息 -->
+                    <span class="page-info">
+                        {{ currentPage }} / {{ totalPages }}
+                    </span>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    <!-- ==================== 确认删除弹窗 ==================== -->
+    <div class="modal-overlay" :class="{ show: modalVisible }" @click.self="modalVisible = false">
+        <div class="modal-box">
+            <h3>确认删除</h3>
+            <p>
+                确定要删除「{{ modalItem?.title?.slice(0, 40) }}...」吗？<br>
+                此操作将从数据库中永久删除该记录及对应图片，不可恢复。
+            </p>
+            <div class="modal-actions">
+                <button class="modal-btn" @click="modalVisible = false">取消</button>
+                <button class="modal-btn danger" @click="doDelete" :disabled="deleting">
+                    {{ deleting ? '删除中...' : '确认删除' }}
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== Toast 提示 ==================== -->
+    <div class="toast" :class="{ show: toastVisible }">{{ toastMessage }}</div>
+</div>
+
+<!-- ==================== Vue 3 应用脚本 ==================== -->
+<script>
+/*
+============================================================================
+quarkF 频道展示 - Vue 3 前端应用
+============================================================================
+
+【功能】
+  1. 展示频道数据列表（卡片网格布局）
+  2. 标签筛选（左侧面板）
+  3. 标题搜索
+  4. 分页浏览
+  5. 图片懒加载（IntersectionObserver）
+
+【技术栈】
+  - Vue 3 (Composition API + Options API)
+  - IntersectionObserver API（图片懒加载）
+  - Fetch API（数据请求）
+  - 纯 CSS 响应式设计
+
+【性能优化策略】
+  1. 图片懒加载：IntersectionObserver 监听进入视口
+  2. 分页加载：避免一次性加载大量数据
+  3. 卡片缓存：浏览器自动缓存图片
+  4. 搜索防抖：输入完成后 300ms 再请求
+============================================================================
+*/
+
+const { createApp, ref, computed, watch, onMounted, nextTick, onBeforeUnmount } = Vue;
+
+const app = createApp({
+    setup() {
+        // ==================== 响应式状态 ====================
+
+        /** 当前页数据列表 */
+        const items = ref([]);
+
+        /** 删除弹窗状态 */
+        const modalVisible = ref(false);
+        const modalItem = ref(null);
+        const deleting = ref(false);
+
+        /** 所有标签列表（含使用次数） */
+        const tags = ref([]);
+
+        /** 当前页码（从 1 开始） */
+        const currentPage = ref(1);
+
+        /** 总记录数 */
+        const total = ref(0);
+
+        /** 总页数 */
+        const totalPages = ref(1);
+
+        /** 是否有上一页 */
+        const hasPrev = ref(false);
+
+        /** 是否有下一页 */
+        const hasNext = ref(false);
+
+        /** 是否正在加载 */
+        const loading = ref(false);
+
+        /** 错误信息（为空表示无错误） */
+        const error = ref('');
+
+        /** 当前选中的标签（null 表示全部） */
+        const selectedTag = ref(null);
+
+        /** 搜索关键词 */
+        const keyword = ref('');
+
+        /** 搜索防抖定时器 */
+        let searchTimer = null;
+
+        /** Toast 提示 */
+        const toastVisible = ref(false);
+        const toastMessage = ref('');
+
+        /** Toast 定时器 */
+        let toastTimer = null;
+
+        /** 移动端标签侧栏折叠状态 */
+        const mobileSidebarCollapsed = ref(true);
+
+        /** 统计信息 */
+        const stats = ref({
+            total_messages: 0,
+            total_images: 0,
+            total_tags: 0,
+            latest_update: '',
+        });
+
+        /** API 基础地址 */
+        const API_BASE = 'http://127.0.0.1:8001';
+
+        // ==================== 计算属性 ====================
+
+        /** 每页条数 */
+        const pageSize = ref(24);
+
+        /**
+         * 生成分页页码列表
+         * 【算法说明】
+         *   当前页前后各显示 2 页，首尾固定显示，中间用 ... 省略
+         *   例如共 20 页，当前在第 10 页：
+         *   1 2 ... 8 9 10 11 12 ... 19 20
+         */
+        const pageNumbers = computed(() => {
+            const pages = [];
+            const total = totalPages.value;
+            const current = currentPage.value;
+
+            if (total <= 7) {
+                // 总页数少于 7 页，全部显示
+                for (let i = 1; i <= total; i++) pages.push(i);
+            } else {
+                // 始终显示第 1 页
+                pages.push(1);
+
+                if (current > 3) pages.push('...');
+
+                // 当前页附近 3 页
+                const start = Math.max(2, current - 1);
+                const end = Math.min(total - 1, current + 1);
+                for (let i = start; i <= end; i++) pages.push(i);
+
+                if (current < total - 2) pages.push('...');
+
+                // 始终显示最后 1 页
+                pages.push(total);
+            }
+            return pages;
+        });
+
+        // ==================== 数据获取 ====================
+
+        /**
+         * 从 API 获取数据列表
+         *
+         * 【参数传递】
+         *   所有筛选参数通过 URL 查询参数传递
+         *   - page: 页码
+         *   - page_size: 每页条数
+         *   - tag: 选中的标签
+         *   - keyword: 搜索关键词
+         *
+         * 【错误处理】
+         *   网络错误、服务器错误都会捕获并显示友好提示
+         */
+        async function fetchData() {
+            loading.value = true;
+            error.value = '';
+
+            try {
+                // 【重点注释】构建请求 URL，拼接查询参数
+                const params = new URLSearchParams({
+                    page: currentPage.value,
+                    page_size: pageSize.value,
+                });
+
+                // 【重点注释】只有选中了标签才传递 tag 参数
+                // 去除 # 前缀，兼容后端处理
+                if (selectedTag.value) {
+                    params.set('tag', selectedTag.value.replace('#', ''));
+                }
+
+                if (keyword.value) {
+                    params.set('keyword', keyword.value);
+                }
+
+                // 【重点注释】发起 API 请求
+                const response = await fetch(`${API_BASE}/api/quarkf/list?${params}`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+
+                if (result.code !== 0) {
+                    throw new Error(result.message || '服务器返回错误');
+                }
+
+                // 更新数据
+                items.value = result.data.items;
+                total.value = result.data.total;
+                totalPages.value = result.data.total_pages;
+                currentPage.value = result.data.page;
+                hasPrev.value = result.data.has_prev;
+                hasNext.value = result.data.has_next;
+
+                // 【重点注释】滚动到顶部，避免停留在页面底部
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            } catch (err) {
+                console.error('数据获取失败:', err);
+                error.value = `加载失败: ${err.message}`;
+                items.value = [];
+            } finally {
+                loading.value = false;
+            }
+        }
+
+        /**
+         * 获取标签列表
+         *
+         * 【缓存策略】
+         *   后端已经做了 5 分钟缓存，前端不再额外缓存
+         */
+        async function fetchTags() {
+            try {
+                const response = await fetch(`${API_BASE}/api/quarkf/tags`);
+                if (!response.ok) return;
+                const result = await response.json();
+                if (result.code === 0) {
+                    tags.value = result.data;
+                }
+            } catch (err) {
+                console.error('标签获取失败:', err);
+            }
+        }
+
+        /**
+         * 获取统计信息
+         */
+        async function fetchStats() {
+            try {
+                const response = await fetch(`${API_BASE}/api/quarkf/stats`);
+                if (!response.ok) return;
+                const result = await response.json();
+                if (result.code === 0) {
+                    stats.value = result.data;
+                }
+            } catch (err) {
+                console.error('统计信息获取失败:', err);
+            }
+        }
+
+        // ==================== 用户交互 ====================
+
+        /**
+         * 选择/切换标签
+         *
+         * 【逻辑说明】
+         *   点击标签时：
+         *   1. 更新 selectedTag
+         *   2. 重置到第 1 页
+         *   3. 重新加载数据
+         *
+         * @param {string|null} tag 标签名，null 表示显示全部
+         */
+        function selectTag(tag) {
+            if (selectedTag.value === tag) return;  // 相同标签不重复加载
+            selectedTag.value = tag;
+            currentPage.value = 1;
+            mobileSidebarCollapsed.value = true;  // 手机端选择后自动折叠
+            fetchData();
+        }
+
+        /**
+         * 跳转到指定页
+         * @param {number} page 目标页码
+         */
+        function goToPage(page) {
+            if (page < 1 || page > totalPages.value) return;
+            currentPage.value = page;
+            fetchData();
+        }
+
+        /**
+         * 搜索输入处理（带防抖）
+         *
+         * 【重点注释】防抖（Debounce）机制
+         *   用户在输入过程中，每次按键都触发请求会浪费服务器资源。
+         *   使用 setTimeout 延迟 300ms 执行，如果 300ms 内再次输入，
+         *   清除之前的定时器重新计时，确保只在用户停顿时发送请求。
+         */
+        function onKeywordInput() {
+            if (searchTimer) clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => {
+                currentPage.value = 1;
+                fetchData();
+            }, 300);
+        }
+
+        /**
+         * 复制链接到剪贴板
+         *
+         * @param {string} link 要复制的链接
+         */
+        async function copyLink(link) {
+            if (!link) {
+                showToast('暂无链接可复制');
+                return;
+            }
+            try {
+                // 【重点注释】使用 Clipboard API 复制到剪贴板
+                await navigator.clipboard.writeText(link);
+                showToast('链接已复制到剪贴板');
+            } catch {
+                // 【重点注释】Clipboard API 可能在 HTTP 下不可用，降级方案
+                const textarea = document.createElement('textarea');
+                textarea.value = link;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showToast('链接已复制到剪贴板');
+            }
+        }
+
+        /**
+         * 图片加载失败处理
+         *
+         * 【重点注释】当图片加载失败时（如文件被删除），显示占位图标
+         * 同时将 image_url 置空，避免再次尝试加载
+         */
+        function onImageError(event, item) {
+            const img = event.target;
+            img.style.display = 'none';
+            // 在 img 位置显示占位
+            const placeholder = document.createElement('div');
+            placeholder.className = 'img-placeholder';
+            placeholder.innerHTML = '&#128247;';
+            img.parentNode.appendChild(placeholder);
+            item.image_url = null;  // 标记为无图片
+        }
+
+        /**
+         * 打开删除确认弹窗
+         *
+         * @param {Object} item 要删除的消息记录
+         */
+        function confirmDelete(item) {
+            modalItem.value = item;
+            modalVisible.value = true;
+        }
+
+        /**
+         * 执行删除操作
+         *
+         * 【实现步骤】
+         *   1. 调用 DELETE API 删除后端数据
+         *   2. 成功后关闭弹窗，从列表中移除该项
+         *   3. 刷新数据列表
+         */
+        async function doDelete() {
+            if (!modalItem.value) return;
+
+            deleting.value = true;
+            try {
+                const msgId = modalItem.value.message_id;
+                const response = await fetch(`${API_BASE}/api/quarkf/${msgId}`, {
+                    method: 'DELETE',
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail?.message || `HTTP ${response.status}`);
+                }
+
+                const result = await response.json();
+                if (result.code !== 0) {
+                    throw new Error(result.message || '删除失败');
+                }
+
+                showToast('删除成功');
+                modalVisible.value = false;
+                modalItem.value = null;
+
+                // 【重点注释】删除后重新加载当前页数据
+                fetchData();
+
+            } catch (err) {
+                console.error('删除失败:', err);
+                showToast(`删除失败: ${err.message}`);
+            } finally {
+                deleting.value = false;
+            }
+        }
+
+        // ==================== Toast 提示 ====================
+
+        /**
+         * 显示 Toast 提示
+         *
+         * @param {string} msg 提示内容
+         */
+        function showToast(msg) {
+            toastMessage.value = msg;
+            toastVisible.value = true;
+            if (toastTimer) clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => {
+                toastVisible.value = false;
+            }, 2000);
+        }
+
+        // ==================== 指令：图片懒加载 ====================
+
+        /*
+        =====================================================================
+        自定义指令 v-lazy：图片懒加载
+        =====================================================================
+
+        【实现原理】
+          使用 IntersectionObserver API 监听图片元素是否进入视口。
+          当图片进入视口时，将 data-src 的值赋给 src，触发浏览器加载。
+
+        【优势】
+          1. 原生 API，无需第三方库
+          2. 性能优于 scroll 事件监听
+          3. 自动处理元素进出视口的检测
+
+        【兼容性】
+          IntersectionObserver 在主流浏览器中均已支持。
+          IE 不支持，但本项目不要求兼容 IE。
+        =====================================================================
+        */
+
+        // 保存所有观察器实例，方便在组件卸载时清理
+        const observers = [];
+
+        app.directive('lazy', {
+            mounted(el) {
+                // 【重点注释】创建 IntersectionObserver 实例
+                const observer = new IntersectionObserver(
+                    (entries) => {
+                        entries.forEach(entry => {
+                            // 【重点注释】当图片进入视口
+                            if (entry.isIntersecting) {
+                                const img = entry.target;
+                                const src = img.getAttribute('data-src');
+                                if (src) {
+                                    img.src = src;
+                                    img.setAttribute('data-loaded', 'true');
+                                }
+                                // 加载完成后取消观察
+                                observer.unobserve(img);
+                            }
+                        });
+                    },
+                    {
+                        rootMargin: '100px',  // 提前 100px 加载，提升体验
+                        threshold: 0.01,       // 只要有 1% 进入视口就触发
+                    }
+                );
+
+                observer.observe(el);
+                observers.push(observer);
+            },
+            unmounted(el) {
+                // 【重点注释】组件卸载时清理观察器，防止内存泄漏
+                observers.forEach(obs => obs.disconnect());
+                observers.length = 0;
+            }
+        });
+
+        // ==================== 监听数据变化（调试用） ====================
+
+        // 监听 selectedTag 变化
+        watch(selectedTag, (val) => {
+            console.log('当前选中标签:', val);
+        });
+
+        // ==================== 生命周期 ====================
+
+        /**
+         * 组件挂载后自动加载数据
+         */
+        onMounted(async () => {
+            // 【重点注释】并行请求，减少等待时间
+            await Promise.all([
+                fetchData(),
+                fetchTags(),
+                fetchStats(),
+            ]);
+        });
+
+        /**
+         * 组件卸载前清理资源
+         */
+        onBeforeUnmount(() => {
+            // 清理搜索防抖定时器
+            if (searchTimer) clearTimeout(searchTimer);
+            // 清理 Toast 定时器
+            if (toastTimer) clearTimeout(toastTimer);
+        });
+
+        // ==================== 导出 ====================
+
+        return {
+            // 状态
+            items,
+            tags,
+            currentPage,
+            total,
+            totalPages,
+            hasPrev,
+            hasNext,
+            loading,
+            error,
+            selectedTag,
+            keyword,
+            toastVisible,
+            toastMessage,
+            mobileSidebarCollapsed,
+            stats,
+            pageSize,
+            modalVisible,
+            modalItem,
+            deleting,
+
+            // 计算属性
+            pageNumbers,
+
+            // 方法
+            fetchData,
+            selectTag,
+            goToPage,
+            onKeywordInput,
+            copyLink,
+            onImageError,
+            confirmDelete,
+            doDelete,
+        };
+    }
+});
+
+app.mount('#app');
+</script>
+</body>
+</html>

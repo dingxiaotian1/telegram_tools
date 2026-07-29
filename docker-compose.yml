@@ -1,0 +1,12 @@
+version: '3.8'
+services:
+  tg-agent:
+    build: .
+    container_name: tg-feishu-agent
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - ./session:/app/session
+    environment:
+      - TZ=Asia/Shanghai

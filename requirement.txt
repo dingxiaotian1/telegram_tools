@@ -1,0 +1,11 @@
+telethon
+requests
+PySocks
+python-socks
+python-dotenv
+fastapi
+uvicorn[standard]
+aiomysql
+Pillow
+cachetools
+
