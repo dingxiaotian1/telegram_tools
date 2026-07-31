@@ -1,4 +1,7 @@
 import asyncio
+import difflib
+import logging
+import logging.handlers
 import os
 import re
 import json
@@ -12,6 +15,7 @@ from telethon.errors import FloodWaitError
 from dotenv import load_dotenv
 
 load_dotenv()
+
 # ================== 配置区 ==================
 API_ID = int(os.getenv('API_ID'))
 API_HASH = os.getenv("API_HASH")
@@ -19,6 +23,10 @@ CHANNEL_USERNAME = 'quarkF'
 
 # PicGo 路径
 PICGO_PATH = r"C:\Program Files\PicGo\PicGo.exe"
+
+# 日志路径
+LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'log')
+os.makedirs(LOG_DIR, exist_ok=True)
 
 # V2Ray 代理配置
 PROXY = {
@@ -68,15 +76,49 @@ os.makedirs(BASE_DIR, exist_ok=True)
 processed_ids = set()
 PROCESSED_IDS_FILE = os.path.join(BASE_DIR, f'{CHANNEL_USERNAME}_processed_ids.json')
 
+# 不入库的标签
+EXCLUDE_TAGS= ['#标签', '#tags', '#标签4', '#标签2']
 
+
+#  日志配置
+def _build_file_handler(filename: str, level=logging.INFO) -> logging.handlers.RotatingFileHandler:
+    handler = logging.handlers.RotatingFileHandler(
+        os.path.join(LOG_DIR, filename),
+        maxBytes=10 * 1024 * 1024,
+        backupCount=5,
+        encoding='utf-8',
+    )
+    handler.setLevel(level)
+    handler.setFormatter(logging.Formatter('%(asctime)s | %(levelname)s | %(message)s'))
+    return handler
+
+
+info_logger = logging.getLogger('quark_info')
+info_logger.setLevel(logging.INFO)
+info_logger.addHandler(_build_file_handler('info.log'))
+
+title_logger = logging.getLogger('quark_title')
+title_logger.setLevel(logging.INFO)
+title_logger.addHandler(_build_file_handler('title.log'))
+
+pic_logger = logging.getLogger('quark_pic')
+pic_logger.setLevel(logging.INFO)
+pic_logger.addHandler(_build_file_handler('pic.log'))
+
+
+# 加载历史记录
 def load_processed_ids():
     global processed_ids
     if os.path.exists(PROCESSED_IDS_FILE):
         with open(PROCESSED_IDS_FILE, 'r', encoding='utf-8') as f:
             processed_ids = set(json.load(f))
         print(f"📂 已加载 {len(processed_ids)} 条历史记录ID")
+        info_logger.info(f"已加载 {len(processed_ids)} 条历史记录ID")
+    else:
+        info_logger.info("历史记录ID文件不存在，使用空集合")
 
 
+# 保存历史记录
 def save_processed_ids():
     with open(PROCESSED_IDS_FILE, 'w', encoding='utf-8') as f:
         json.dump(list(processed_ids), f)
@@ -112,12 +154,12 @@ def extract_info(text):
     """智能提取标题、链接、标签 + 干净的资源简介"""
     advertising = "Telegram必备的搜索引擎，极搜JISOU帮你精准找到，想要的群组、频道、视频、音乐"
     if not text:
-        return {}, text
+        return {}, text, ""
 
     lines = [line.strip() for line in text.split('\n') if line.strip()]
     title = lines[0] if lines else ""
     if advertising in title:
-        return {}, ""
+        return {}, "", ""
 
     # 提取下载链接
     links = re.findall(r'https?://[^\s]+', text)
@@ -151,40 +193,11 @@ def extract_info(text):
 
 # ================== PicGo 上传函数 ==================
 def upload_with_picgo(local_path: str) -> str:
-    """通过 PicGo HTTP 接口上传。注意：需本地安装 PicGo 并配置好参数"""
-    try:
-        url = "http://127.0.0.1:36677/upload"  # PicGo Server 默认地址
-
-        with open(local_path, 'rb') as f:
-            files = {'file': f}
-            response = requests.post(url, files=files, timeout=60)
-
-        if response.status_code == 200:
-            data = response.json()
-            if data.get('success'):
-                image_info = data['result'][0]  # PicGo 返回的 URL
-                print(f"✅ PicGo 上传成功: {image_info}")
-                return image_info
-            else:
-                print(f"⚠️ PicGo 返回失败: {data}")
-        else:
-            print(f"❌ HTTP 错误 {response.status_code}: {response.text}")
-
-        return f"failed:{os.path.basename(local_path)}"
-
-    except requests.exceptions.ConnectionError:
-        print("❌ PicGo Server 未启动！请在 PicGo 设置中开启 Server")
-        return f"server_off:{os.path.basename(local_path)}"
-    except Exception as e:
-        print(f"❌ 上传异常: {e}")
-        return f"error:{os.path.basename(local_path)}"
-
-
-def upload_with_picgo(local_path: str) -> str:
     """
     通过 PicGo HTTP 接口上传。注意：需本地安装 PicGo 并配置好参数
     参考：https://docs.picgo.app/zh/gui/guide/advance#PicGo-Server%E7%9A%84%E4%BD%BF%E7%94%A8
     """
+    filename = os.path.basename(local_path) if local_path else "unknown"
     try:
         url = "http://127.0.0.1:36677/upload"  # PicGo Server 默认地址
 
@@ -198,20 +211,89 @@ def upload_with_picgo(local_path: str) -> str:
             data = response.json()
             if data.get('success') and data.get('result'):
                 image_info = data['result'][0] if isinstance(data['result'], list) else data['result']
+                info_logger.info(f"PicGo 上传成功: {filename} -> {image_info}")
                 return image_info
             else:
-                print(f"⚠️ PicGo 返回失败: {data.get('message')}")
+                msg = f"PicGo 返回失败: {data.get('message')}"
+                print(f"⚠️ {msg}")
+                pic_logger.warning(f"{msg} | file={filename}")
         else:
-            print(f"❌ HTTP 错误: {response.text}")
+            msg = f"HTTP 错误 {response.status_code}: {response.text}"
+            print(f"❌ {msg}")
+            pic_logger.error(f"{msg} | file={filename}")
 
-        return f"failed:{filename}"
+        result = f"failed:{filename}"
+        pic_logger.error(f"上传失败返回 {result}")
+        return result
 
     except requests.exceptions.ConnectionError:
         print("❌ PicGo Server 未启动，请在 PicGo 设置中开启 Server")
+        pic_logger.critical(f"PicGo Server 未启动 (ConnectionError) | file={filename}")
         return "server_off"
     except Exception as e:
         print(f"❌ 异常: {e}")
-        return f"error:{os.path.basename(local_path)}"
+        pic_logger.exception(f"PicGo 上传异常: {e} | file={filename}")
+        return f"error:{filename}"
+
+
+# ================== 比较标题 ==================
+def get_quark_title(link):
+    pwd_id = link.split("/")[-1]
+    title = ""
+    session = requests.Session()
+
+    token_url = "https://drive-h.quark.cn/1/clouddrive/share/sharepage/token"
+    params = {
+        "pr": "ucpro",
+        "fr": "pc",
+        "uc_param_str": "",
+    }
+    payload = {
+        "pwd_id": pwd_id,
+        "passcode": "",
+        "support_visit_limit_private_share": True,
+    }
+
+    res = session.post(token_url, params=params, json=payload)
+    try:
+        data = res.json()
+        if data.get("data") and data["data"].get("title"):
+            title = data["data"]["title"]
+    except Exception as e:
+        print(f"解析 JSON 失败: {e}")
+        print(res.text)
+        info_logger.error(f"解析 JSON 失败: {e}")
+        info_logger.error(res.text)
+    finally:
+        return title
+
+
+def compare_title(title1, title2, ):
+    """
+    比较两个标题/文本的相似度。
+
+    参数:
+        title1 -- 夸克原本标题
+        title2 -- 电报描述标题
+    返回:
+        True: 标题一致
+        False: 标题不一致
+    """
+    if not title1 or not title2:
+        title_logger.info(f"标题不一致(空值): title1={title1!r} | title2={title2!r}")
+        return False
+    if title1 == title2:
+        return True
+    title1_l = title1.lower()
+    title2_l = title2.lower()
+    similarity = difflib.SequenceMatcher(None, title1_l, title2_l).quick_ratio()
+    result = similarity > 0.2
+    if not result:
+        title_logger.info(
+            f"标题不一致(相似度 {similarity:.3f}): "
+            f"[夸克]{title1!r} vs [电报]{title2!r}"
+        )
+    return result
 
 
 async def download_media_with_progress(message, save_path):
@@ -265,39 +347,67 @@ async def write_to_sql(record, pool):
         json.dumps(record.get("标签")),
         record.get("原始内容"),
     ]
-    async with pool.acquire() as conn:
-        async with conn.cursor() as cursor:
-            await cursor.execute(insert_sql, fields)
+    try:
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cursor:
+                await cursor.execute(insert_sql, fields)
 
-            # 【重点注释】同时写入标签关联表
-            # 遍历记录中的标签列表，每个标签写入一行
-            # 使用 INSERT IGNORE 避免同一条消息的相同标签重复写入
-            tags = record.get("标签", [])
-            if tags:
-                for tag_name in tags:
-                    try:
-                        await cursor.execute(insert_tag_sql, (record.get("message_id"), tag_name))
-                    except Exception as e:
-                        # 标签关联表写入失败不影响主流程
-                        print(f"⚠️ 标签关联表写入失败 (message_id={record.get('message_id')}, tag={tag_name}): {e}")
+                tags = record.get("标签", [])
+                if tags and isinstance(tags, list):
+                    for tag_name in tags:
+                        if tag_name in EXCLUDE_TAGS:
+                            continue
+                        try:
+                            await cursor.execute(insert_tag_sql, (record.get("message_id"), tag_name))
+                        except Exception as e:
+                            print(f"⚠️ 标签关联表写入失败 (message_id={record.get('message_id')}, tag={tag_name}): {e}")
+                            info_logger.warning(
+                                f"标签关联表写入失败 (message_id={record.get('message_id')}, "
+                                f"tag={tag_name}): {e}"
+                            )
+
+        info_logger.info(
+            f"写入数据库成功: message_id={record.get('message_id')} | "
+            f"title={record.get('标题')!r} | tags={record.get('标签')}"
+        )
+    except Exception as e:
+        info_logger.exception(
+            f"写入数据库失败: message_id={record.get('message_id')} | "
+            f"title={record.get('标题')!r} | err={e}"
+        )
+        raise
 
 
 async def fetch_history(entity, pool, limit=300):
     """抓取历史消息"""
     print(f"📜 开始抓取最近 {limit} 条历史消息...")
+    info_logger.info(f"开始抓取最近 {limit} 条历史消息")
     count = 0
     async for message in client.iter_messages(entity, limit=limit):
         if message.id in processed_ids:
             continue
-        image_info = ""
-        if message.photo:
-            path = os.path.join(BASE_DIR, f"{message.id}.jpg")
-            image_info = await download_media_with_progress(message, path)
-
         processed_ids.add(message.id)
 
         text = message.message or ""
         extra, title, link = extract_info(text)
+
+        if not title or not link:
+            info_logger.info(f"[历史] message_id={message.id} 被跳过：缺少标题或链接 (title={title!r}, link={link!r})")
+            continue
+
+        if "quark" in link:
+            quark_title = get_quark_title(link)
+            info_logger.info(
+                f"[历史] message_id={message.id} 夸克标题对比: "
+                f"quark={quark_title!r} vs tg={title!r}"
+            )
+            if not compare_title(quark_title, title):
+                continue
+
+        image_info = ""
+        if message.photo:
+            path = os.path.join(BASE_DIR, f"{message.id}.jpg")
+            image_info = await download_media_with_progress(message, path)
 
         record = {
             "message_id": str(message.id),
@@ -305,9 +415,6 @@ async def fetch_history(entity, pool, limit=300):
             "image_info": image_info,
             **extra
         }
-        if not title or not link:
-            continue
-
         await write_to_sql(record, pool)
         save_processed_ids()
         count += 1
@@ -315,7 +422,8 @@ async def fetch_history(entity, pool, limit=300):
 
         await asyncio.sleep(0.6)  # 避免太快触发限制
 
-    print(f"✅ 历史消息抓取完成，共处理 {count} 条")
+    print(f"✅ 历史消息抓取完成，共存入数据库 {count} 条")
+    info_logger.info(f"✅ 历史消息抓取完成，共存入数据库 {count} 条")
 
 
 # 全局变量存储连接池
@@ -333,7 +441,18 @@ async def handler(event):
     text = msg.message or ""
     extra, title, link = extract_info(text)
     if not title or not link:
+        info_logger.info(f"[新消息] message_id={msg.id} 被跳过：缺少标题或链接 (title={title!r}, link={link!r})")
         return
+
+    if "quark" in link:
+        quark_title = get_quark_title(link)
+        info_logger.info(
+            f"[新消息] message_id={msg.id} 夸克标题对比: "
+            f"quark={quark_title!r} vs tg={title!r}"
+        )
+        if not compare_title(quark_title, title):
+            return
+
     image_info = ""
     if msg.photo:
         path = os.path.join(BASE_DIR, f"{msg.id}.jpg")
@@ -349,11 +468,16 @@ async def handler(event):
     save_processed_ids()
 
     print(f"🟢 [新] {title[:60]}...")
+    info_logger.info(f"[新消息] 处理完成: message_id={msg.id} | title={title!r}")
 
 
 async def main():
     global db_pool
     print("🚀 Telegram Channel Agent 启动中...")
+    info_logger.info("=" * 60)
+    info_logger.info("Telegram Channel Agent 启动中")
+    info_logger.info(f"目标频道: {CHANNEL_USERNAME}")
+    info_logger.info(f"代理端口: {PROXY['port']}")
     print(f"目标频道: {CHANNEL_USERNAME}")
     print(f"代理端口: {PROXY['port']}")
 
@@ -361,22 +485,28 @@ async def main():
         load_processed_ids()
         db_pool = await create_db_pool()
         print("✅ 数据库连接池已创建")
+        info_logger.info("数据库连接池已创建")
         await client.start()
+        info_logger.info("Telegram 客户端登录成功")
         entity = await client.get_entity(CHANNEL_USERNAME)
         print(f"✅ 已连接频道: {getattr(entity, 'title', CHANNEL_USERNAME)}")
+        info_logger.info(f"已连接频道: {getattr(entity, 'title', CHANNEL_USERNAME)}")
 
         # 先抓历史
-        await fetch_history(entity, db_pool, limit=30)  # 可改大一点
+        await fetch_history(entity, db_pool, limit=300)  # 可改大一点
 
         print("🔴 开始实时监听新消息...（按 Ctrl+C 停止）")
+        info_logger.info("开始实时监听新消息")
 
     except FloodWaitError as e:
         print(f"⏳ 被 Telegram 限制，请等待 {e.seconds} 秒...")
+        info_logger.warning(f"被 Telegram 限制，等待 {e.seconds} 秒: {e}")
         await asyncio.sleep(e.seconds)
     except Exception as e:
         print(f"❌ 启动失败: {e}")
         import traceback
         traceback.print_exc()
+        info_logger.exception(f"启动失败: {e}")
         if db_pool:
             db_pool.close()
             await db_pool.wait_closed()
@@ -389,6 +519,8 @@ async def main():
             db_pool.close()
             await db_pool.wait_closed()
             print("✅ 数据库连接池已关闭")
+            info_logger.info("数据库连接池已关闭，程序结束")
+        info_logger.info("=" * 60)
 
 
 """
