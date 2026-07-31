@@ -146,7 +146,7 @@ def extract_info(text):
         "标签": tags,
         "原始内容": text,
     }
-    return record, title
+    return record, title, download_links
 
 
 # ================== PicGo 上传函数 ==================
@@ -297,7 +297,7 @@ async def fetch_history(entity, pool, limit=300):
         processed_ids.add(message.id)
 
         text = message.message or ""
-        extra, title = extract_info(text)
+        extra, title, link = extract_info(text)
 
         record = {
             "message_id": str(message.id),
@@ -305,7 +305,7 @@ async def fetch_history(entity, pool, limit=300):
             "image_info": image_info,
             **extra
         }
-        if not title:
+        if not title or not link:
             continue
 
         await write_to_sql(record, pool)
@@ -331,8 +331,8 @@ async def handler(event):
     processed_ids.add(msg.id)
 
     text = msg.message or ""
-    extra, title = extract_info(text)
-    if not title:
+    extra, title, link = extract_info(text)
+    if not title or not link:
         return
     image_info = ""
     if msg.photo:
