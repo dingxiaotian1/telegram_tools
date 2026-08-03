@@ -50,7 +50,7 @@ logging.basicConfig(
     format='%(asctime)s | %(levelname)-7s | %(name)s | %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
-logger = logging.getLogger('quarkF-API')
+logger = logging.getLogger(f'{settings.CHANNEL_NAME}-API')
 
 # ==================== 应用生命周期管理 ====================
 @asynccontextmanager
@@ -72,7 +72,7 @@ async def lifespan(app_instance: FastAPI):
     """
     # ==================== 启动逻辑 ====================
     logger.info("=" * 60)
-    logger.info("quarkF API 服务启动中...")
+    logger.info(f"{settings.CHANNEL_NAME} API 服务启动中...")
     logger.info(f"数据库: {settings.DB_HOST}:3306/{settings.DB_DB}")
     logger.info(f"图片目录: {settings.IMAGE_BASE_DIR}")
     logger.info(f"API 文档: http://localhost:{settings.API_PORT}/api/docs")
@@ -330,10 +330,10 @@ async def get_quarkf_list(
                     # 因为 EXISTS 找到第一条匹配就停止，而 JOIN 需要处理所有匹配行
                     # 先尝试关联表，如果表不存在则降级使用 JSON_CONTAINS
                     try:
-                        test_where = "EXISTS (SELECT 1 FROM quarkF_tags qt WHERE qt.message_id = q.message_id AND qt.tag_name = %s)"
+                        test_where = f"EXISTS (SELECT 1 FROM {settings.CHANNEL_NAME}_tags qt WHERE qt.message_id = q.message_id AND qt.tag_name = %s)"
                         test_params = [f"#{clean_tag}"]
                         # 试探关联表是否存在
-                        test_sql = f"SELECT 1 FROM quarkF q WHERE {test_where} LIMIT 1"
+                        test_sql = f"SELECT 1 FROM {settings.CHANNEL_NAME} q WHERE {test_where} LIMIT 1"
                         await cursor.execute(test_sql, test_params)
                         # 关联表存在，使用关联表查询
                         where_clauses.append(test_where)
@@ -342,7 +342,7 @@ async def get_quarkf_list(
                         # 【重点注释】关联表不存在时降级方案
                         # 使用 JSON_CONTAINS 在主表的 tags 字段中搜索标签
                         # JSON_CONTAINS(tags, '"#标签名"') 语法：检查 tags JSON 数组是否包含指定值
-                        logger.warning("quarkF_tags 表不存在，降级使用 JSON_CONTAINS 筛选标签")
+                        logger.warning(f"{settings.CHANNEL_NAME}_tags 表不存在，降级使用 JSON_CONTAINS 筛选标签")
                         where_clauses.append(
                             "JSON_CONTAINS(q.tags, %s)"
                         )
@@ -359,7 +359,7 @@ async def get_quarkf_list(
 
                 # ==================== 查询总数 ====================
                 # 先查询总记录数，用于计算页数
-                count_sql = f"SELECT COUNT(*) AS total FROM quarkF q WHERE {where_sql}"
+                count_sql = f"SELECT COUNT(*) AS total FROM {settings.CHANNEL_NAME} q WHERE {where_sql}"
                 await cursor.execute(count_sql, params)
                 result = await cursor.fetchone()
                 total = result['total']
@@ -381,7 +381,7 @@ async def get_quarkf_list(
                         q.link_url,
                         q.tags,
                         q.original_content
-                    FROM quarkF q
+                    FROM {settings.CHANNEL_NAME} q
                     WHERE {where_sql}
                     ORDER BY q.publish_time DESC
                     LIMIT %s OFFSET %s
@@ -504,9 +504,9 @@ async def get_tags():
                 # 优先从 quarkF_tags 关联表查询（推荐方案）
                 # 如果关联表存在且有数据，查询性能更高
                 try:
-                    await cursor.execute("""
+                    await cursor.execute(f"""
                         SELECT tag_name AS tag, COUNT(*) AS `count`
-                        FROM quarkF_tags
+                        FROM {settings.CHANNEL_NAME}_tags
                         GROUP BY tag_name
                         ORDER BY `count` DESC
                         LIMIT 200
@@ -521,7 +521,7 @@ async def get_tags():
 
                 except Exception:
                     # 关联表不存在时（如未执行迁移脚本），降级方案
-                    logger.warning("quarkF_tags 表不存在或查询失败，降级使用 JSON 解析")
+                    logger.warning(f"{settings.CHANNEL_NAME}_tags 表不存在或查询失败，降级使用 JSON 解析")
                     tags_data = await _parse_tags_from_json(cursor)
 
         response_data = {
@@ -559,7 +559,7 @@ async def _parse_tags_from_json(cursor) -> List[dict]:
     ==========================================================================
     """
     tag_count = {}
-    await cursor.execute("SELECT tags FROM quarkF WHERE tags IS NOT NULL AND tags != '[]'")
+    await cursor.execute(f"SELECT tags FROM {settings.CHANNEL_NAME} WHERE tags IS NOT NULL AND tags != '[]'")
 
     for row in await cursor.fetchall():
         try:
@@ -651,22 +651,22 @@ async def get_stats():
             async with conn.cursor(aiomysql.DictCursor) as cursor:
 
                 # 消息总数
-                await cursor.execute("SELECT COUNT(*) AS cnt FROM quarkF")
+                await cursor.execute(f"SELECT COUNT(*) AS cnt FROM {settings.CHANNEL_NAME}")
                 total_messages = (await cursor.fetchone())['cnt']
 
                 # 有图片的消息数（image_info 非空）
-                await cursor.execute("SELECT COUNT(*) AS cnt FROM quarkF WHERE image_info IS NOT NULL AND image_info != ''")
+                await cursor.execute(f"SELECT COUNT(*) AS cnt FROM {settings.CHANNEL_NAME} WHERE image_info IS NOT NULL AND image_info != ''")
                 total_images = (await cursor.fetchone())['cnt']
 
                 # 标签种类数和最新更新时间
                 try:
                     # 优先从关联表查询
-                    await cursor.execute("SELECT COUNT(DISTINCT tag_name) AS cnt FROM quarkF_tags")
+                    await cursor.execute(f"SELECT COUNT(DISTINCT tag_name) AS cnt FROM {settings.CHANNEL_NAME}_tags")
                     total_tags = (await cursor.fetchone())['cnt']
                 except Exception:
                     total_tags = 0
 
-                await cursor.execute("SELECT MAX(publish_time) AS latest FROM quarkF")
+                await cursor.execute(f"SELECT MAX(publish_time) AS latest FROM {settings.CHANNEL_NAME}")
                 latest = (await cursor.fetchone())['latest']
                 latest_update = latest.strftime('%Y-%m-%d %H:%M:%S') if latest else ''
 
@@ -727,14 +727,14 @@ async def delete_quarkf(message_id: int):
             async with conn.cursor() as cursor:
                 # 删除关联表中的标签记录
                 await cursor.execute(
-                    "DELETE FROM quarkF_tags WHERE message_id = %s",
+                    f"DELETE FROM {settings.CHANNEL_NAME}_tags WHERE message_id = %s",
                     (message_id,)
                 )
                 tag_deleted = cursor.rowcount
 
                 # 删除主表记录
                 await cursor.execute(
-                    "DELETE FROM quarkF WHERE message_id = %s",
+                    f"DELETE FROM {settings.CHANNEL_NAME} WHERE message_id = %s",
                     (message_id,)
                 )
                 row_deleted = cursor.rowcount
