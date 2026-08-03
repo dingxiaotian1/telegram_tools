@@ -19,13 +19,14 @@ load_dotenv()
 # ================== 配置区 ==================
 API_ID = int(os.getenv('API_ID'))
 API_HASH = os.getenv("API_HASH")
-CHANNEL_USERNAME = 'quarkF'
+# CHANNEL_USERNAME = 'quarkF'
+CHANNEL_USERNAME = os.getenv("CHANNEL_NAME")
 
 # PicGo 路径
 PICGO_PATH = r"C:\Program Files\PicGo\PicGo.exe"
 
 # 日志路径
-LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'log')
+LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'log', CHANNEL_USERNAME)
 os.makedirs(LOG_DIR, exist_ok=True)
 
 # V2Ray 代理配置
@@ -44,6 +45,10 @@ db_config = {
     'charset': 'utf8mb4',
 }
 
+# 数据表命名
+TABLE_NAME = CHANNEL_USERNAME
+TABLE_TAG_NAME = f'{CHANNEL_USERNAME}_tags'
+
 # 初始化 Telegram 客户端
 client = TelegramClient(
     'tg_channel_session',
@@ -51,22 +56,6 @@ client = TelegramClient(
     API_HASH,
     proxy=PROXY,
 )
-
-
-# 创建连接池
-async def create_db_pool():
-    pool = await aiomysql.create_pool(
-        host=db_config["host"],
-        user=db_config["user"],
-        password=db_config["password"],
-        db=db_config["db"],
-        charset=db_config["charset"],
-        autocommit=True,
-        minsize=1,
-        maxsize=5,
-    )
-    return pool
-
 
 # 创建保存图片的文件夹
 BASE_DIR = f'./channel_data/{CHANNEL_USERNAME}/'
@@ -77,7 +66,7 @@ processed_ids = set()
 PROCESSED_IDS_FILE = os.path.join(BASE_DIR, f'{CHANNEL_USERNAME}_processed_ids.json')
 
 # 不入库的标签
-EXCLUDE_TAGS= ['#标签', '#tags', '#标签4', '#标签2']
+EXCLUDE_TAGS = ['#标签', '#tags', '#标签4', '#标签2']
 
 
 #  日志配置
@@ -105,6 +94,75 @@ pic_logger = logging.getLogger('quark_pic')
 pic_logger.setLevel(logging.INFO)
 pic_logger.addHandler(_build_file_handler('pic.log'))
 
+# ================== 数据库建表语句 ==================
+create_table_sql = f"""
+CREATE TABLE IF NOT EXISTS `{TABLE_NAME}` (
+  `message_id` VARCHAR(64) NOT NULL COMMENT '主键，唯一，不自增',
+  `title` VARCHAR(255) NOT NULL COMMENT '标题',
+  `publish_time` DATETIME NULL COMMENT '发布时间',
+  `image_info` TEXT NULL COMMENT '图片（多图存JSON数组）',
+  `resource_desc` TEXT NULL COMMENT '资源简介',
+  `link_url` VARCHAR(768) NOT NULL COMMENT '资源外部链接',
+  `tags` VARCHAR(512) NULL COMMENT '标签，多标签逗号分隔',
+  `original_content` LONGTEXT NULL COMMENT '原始完整内容',
+  PRIMARY KEY (`message_id`),
+  UNIQUE KEY `uk_link_url` (`link_url`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='夸克资源';
+"""
+create_table_tag_sql = f"""
+CREATE TABLE IF NOT EXISTS {TABLE_TAG_NAME} (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '自增主键',
+    message_id VARCHAR(64) NOT NULL COMMENT '关联 quarkF 表的 message_id',
+    tag_name VARCHAR(100) NOT NULL COMMENT '标签名称（含 # 号，如 #科幻）',
+    INDEX idx_message_id (message_id) COMMENT '按消息ID查询索引',
+    INDEX idx_tag_name (tag_name) COMMENT '按标签名查询索引'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='quarkF 频道标签关联表';
+"""
+
+# ================== 数据库插入语句 ==================
+insert_sql = f"""
+insert ignore into {TABLE_NAME} (message_id, title, image_info, publish_time, resource_desc, link_url, tags, original_content)
+values (%s, %s, %s, %s, %s, %s, %s, %s)
+"""
+
+# 向标签关联表写入数据的 SQL 语句
+insert_tag_sql = f"""
+INSERT IGNORE INTO {TABLE_TAG_NAME} (message_id, tag_name)
+VALUES (%s, %s)
+"""
+
+
+# 创建连接池
+async def create_db_pool():
+    pool = await aiomysql.create_pool(
+        host=db_config["host"],
+        user=db_config["user"],
+        password=db_config["password"],
+        db=db_config["db"],
+        charset=db_config["charset"],
+        autocommit=True,
+        minsize=1,
+        maxsize=5,
+    )
+    return pool
+
+
+# 初始化数据库
+async def init_database(pool):
+    """检查并创建数据库表（如果不存在）"""
+    print("🗄️  检查数据库表结构...")
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cursor:
+            # 检查并创建主表
+            await cursor.execute(create_table_sql)
+            print(f"✅ 数据表 `{TABLE_NAME}` 已就绪")
+
+            # 检查并创建标签关联表
+            await cursor.execute(create_table_tag_sql)
+            print(f"✅ 数据表 `{TABLE_TAG_NAME}` 已就绪")
+
+    info_logger.info(f"数据库表初始化完成: {TABLE_NAME}, {TABLE_TAG_NAME}")
+
 
 # 加载历史记录
 def load_processed_ids():
@@ -122,19 +180,6 @@ def load_processed_ids():
 def save_processed_ids():
     with open(PROCESSED_IDS_FILE, 'w', encoding='utf-8') as f:
         json.dump(list(processed_ids), f)
-
-
-# ================== 数据库语句 ==================
-insert_sql = """
-insert ignore into quarkF (message_id, title, image_info, publish_time, resource_desc, link_url, tags, original_content)
-values (%s, %s, %s, %s, %s, %s, %s, %s)
-"""
-
-# 向标签关联表写入数据的 SQL 语句
-insert_tag_sql = """
-INSERT IGNORE INTO quarkF_tags (message_id, tag_name)
-VALUES (%s, %s)
-"""
 
 
 # ================== 进度回调 ==================
@@ -180,6 +225,9 @@ def extract_info(text):
 
     # 清理多余空行
     description = re.sub(r'\n\s*\n', '\n\n', description).strip()
+
+    # 去掉非内容行
+    description = re.sub(r'\n\n.+$', '', description, flags=re.S).strip()
 
     record = {
         "标题": title,
@@ -486,6 +534,10 @@ async def main():
         db_pool = await create_db_pool()
         print("✅ 数据库连接池已创建")
         info_logger.info("数据库连接池已创建")
+
+        # 自动检查并创建数据库表
+        await init_database(db_pool)
+
         await client.start()
         info_logger.info("Telegram 客户端登录成功")
         entity = await client.get_entity(CHANNEL_USERNAME)
