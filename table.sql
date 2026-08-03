@@ -14,7 +14,7 @@ CREATE TABLE `quarkF` (
 -- 此表存储每条消息的标签，message_id 关联主表
 CREATE TABLE IF NOT EXISTS quarkF_tags (
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '自增主键',
-    message_id BIGINT NOT NULL COMMENT '关联 quarkF 表的 message_id',
+    message_id VARCHAR(64) NOT NULL COMMENT '关联 quarkF 表的 message_id',
     tag_name VARCHAR(100) NOT NULL COMMENT '标签名称（含 # 号，如 #科幻）',
     INDEX idx_message_id (message_id) COMMENT '按消息ID查询索引',
     INDEX idx_tag_name (tag_name) COMMENT '按标签名查询索引'
