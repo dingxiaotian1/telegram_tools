@@ -92,19 +92,19 @@ class Settings:
     CACHE_LIST_TTL: int = 60
     """数据列表缓存时间（秒），默认 1 分钟"""
 
+    # ==================== 频道配置 ====================
+    CHANNEL_NAME: str = os.getenv('CHANNEL_NAME', 'quarkF')
+    """Telegram 频道用户名"""
+
     # ==================== 图片配置 ====================
     # 【重点注释】图片文件命名规则：{message_id}.jpg
     # 图片文件存储在 channel_data/quarkF/ 目录下
     IMAGE_BASE_DIR: str = os.path.join(
         PROJECT_ROOT,
         'channel_data',
-        'quarkF'
+        CHANNEL_NAME
     )
     """图片文件存储目录的绝对路径"""
-
-    # ==================== 频道配置 ====================
-    CHANNEL_USERNAME: str = 'quarkF'
-    """Telegram 频道用户名"""
 
     # ==================== 分页默认值 ====================
     DEFAULT_PAGE_SIZE: int = 20
