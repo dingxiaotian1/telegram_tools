@@ -3,11 +3,11 @@ import difflib
 import logging
 import logging.handlers
 import os
-import re
 import json
 import time
 from datetime import datetime
 
+import opencc
 import aiomysql
 import requests
 from telethon import TelegramClient, events
@@ -19,11 +19,10 @@ load_dotenv()
 # ================== 配置区 ==================
 API_ID = int(os.getenv('API_ID'))
 API_HASH = os.getenv("API_HASH")
-# CHANNEL_USERNAME = 'quarkF'
 CHANNEL_USERNAME = os.getenv("CHANNEL_NAME")
 
 # PicGo 路径
-PICGO_PATH = r"C:\Program Files\PicGo\PicGo.exe"
+PICGO_PATH = os.getenv('PICGO_PATH')
 
 # 日志路径
 LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'log', CHANNEL_USERNAME)
@@ -68,6 +67,8 @@ PROCESSED_IDS_FILE = os.path.join(BASE_DIR, f'{CHANNEL_USERNAME}_processed_ids.j
 # 不入库的标签
 EXCLUDE_TAGS = ['#标签', '#tags', '#标签4', '#标签2']
 
+# 繁体转简体工具
+cc = opencc.OpenCC('t2s')
 
 #  日志配置
 def _build_file_handler(filename: str, level=logging.INFO) -> logging.handlers.RotatingFileHandler:
@@ -197,45 +198,16 @@ def progress_callback(current, total, start_time=None):
 
 def extract_info(text):
     """智能提取标题、链接、标签 + 干净的资源简介"""
-    advertising = "Telegram必备的搜索引擎，极搜JISOU帮你精准找到，想要的群组、频道、视频、音乐"
-    if not text:
-        return {}, text, ""
+    record, title, download_links = {}, text, ""
 
-    lines = [line.strip() for line in text.split('\n') if line.strip()]
-    title = lines[0] if lines else ""
-    if advertising in title:
-        return {}, "", ""
+    if CHANNEL_USERNAME in ["quarkF", "FLMdongtianfudi"]:
+        from extract_info import quarkF_info
+        record, title, download_links = quarkF_info(text)
+    elif CHANNEL_USERNAME in ["BooksRealm"]:
+        from extract_info import BooksRealm_info
+        text = cc.convert(text)
+        record, title, download_links = BooksRealm_info(text)
 
-    # 提取下载链接
-    links = re.findall(r'https?://[^\s]+', text)
-    download_links = '\n'.join(links)
-
-    # 提取标签
-    tags = re.findall(r'#\w+', text)
-    tags = list(set(tags))
-
-    # 去掉标题行
-    description = re.sub(r'^.*?\n', '', text, count=1).strip()
-
-    # 去掉标签行、下载链接行、‼️ 行
-    description = re.sub(r'🏷️.*?#.*?\n', '', description, flags=re.DOTALL)
-    description = re.sub(r'🔗.*?(https?://[^\s]+)', '', description, flags=re.DOTALL)
-    description = re.sub(r'‼️.*?(\n|$)', '', description, flags=re.DOTALL)
-    description = re.sub(r'📝 资源介绍：\s*', '', description)
-
-    # 清理多余空行
-    description = re.sub(r'\n\s*\n', '\n\n', description).strip()
-
-    # 去掉非内容行
-    description = re.sub(r'\n\n.+$', '', description, flags=re.S).strip()
-
-    record = {
-        "标题": title,
-        "资源简介": description,
-        "链接": download_links,
-        "标签": tags,
-        "原始内容": text,
-    }
     return record, title, download_links
 
 
@@ -392,7 +364,7 @@ async def write_to_sql(record, pool):
         datetime.fromisoformat(record.get("date").replace('Z', '+00:00')).strftime("%Y-%m-%d %H:%M:%S"),
         record.get("资源简介"),
         record.get("链接"),
-        json.dumps(record.get("标签")),
+        json.dumps(record.get("标签"), ensure_ascii=False),
         record.get("原始内容"),
     ]
     try:
@@ -443,7 +415,7 @@ async def fetch_history(entity, pool, limit=300):
             info_logger.info(f"[历史] message_id={message.id} 被跳过：缺少标题或链接 (title={title!r}, link={link!r})")
             continue
 
-        if "quark" in link:
+        if "quark" in link and CHANNEL_USERNAME == "quarkF":
             quark_title = get_quark_title(link)
             info_logger.info(
                 f"[历史] message_id={message.id} 夸克标题对比: "
@@ -492,7 +464,7 @@ async def handler(event):
         info_logger.info(f"[新消息] message_id={msg.id} 被跳过：缺少标题或链接 (title={title!r}, link={link!r})")
         return
 
-    if "quark" in link:
+    if "quark" in link and CHANNEL_USERNAME == "quarkF":
         quark_title = get_quark_title(link)
         info_logger.info(
             f"[新消息] message_id={msg.id} 夸克标题对比: "
@@ -545,7 +517,7 @@ async def main():
         info_logger.info(f"已连接频道: {getattr(entity, 'title', CHANNEL_USERNAME)}")
 
         # 先抓历史
-        await fetch_history(entity, db_pool, limit=300)  # 可改大一点
+        await fetch_history(entity, db_pool, limit=1000)  # 可改大一点
 
         print("🔴 开始实时监听新消息...（按 Ctrl+C 停止）")
         info_logger.info("开始实时监听新消息")
