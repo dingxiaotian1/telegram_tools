@@ -8,4 +8,4 @@ uvicorn[standard]
 aiomysql
 Pillow
 cachetools
-
+opencc-python-reimplemented
